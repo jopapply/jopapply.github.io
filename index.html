@@ -449,6 +449,22 @@
       min-height: 1.2em;
     }
 
+    .pay-warning {
+      margin-top: 1.1rem;
+      padding: 0.85rem 1rem;
+      background: rgba(196, 92, 58, 0.1);
+      border: 1px solid rgba(196, 92, 58, 0.25);
+      border-radius: 12px;
+      font-size: 0.82rem;
+      color: var(--text);
+      line-height: 1.5;
+      text-align: left;
+    }
+
+    .pay-warning strong {
+      color: var(--accent);
+    }
+
     /* Team */
     .team {
       margin-top: 4rem;
@@ -625,6 +641,9 @@
         >
           Pay ₹499 via UPI
         </a>
+        <p class="pay-warning" style="margin-top:1rem;">
+          <strong>Note:</strong> Application is submitted only after payment is completed. Going back without paying will not register your resume.
+        </p>
       </div>
       <button class="back-link" type="button" id="backBtn">← Choose another file</button>
     </div>
@@ -639,8 +658,12 @@
         </p>
         <p class="thanks-ref" id="thanksRef"></p>
 
+        <div class="pay-warning">
+          <strong>Important:</strong> If you did not complete the ₹499 UPI payment, your application is <strong>not submitted</strong>. Please pay to finish registration.
+        </div>
+
         <div class="resume-share" id="resumeShare">
-          <p class="share-hint">Use this link to view or share your resume — no download needed.</p>
+          <p class="share-hint">Use this link to view or share your resume — no download needed. Each upload gets a unique file name.</p>
           <div class="share-row">
             <a class="share-link" id="resumeLink" href="#" target="_blank" rel="noopener">View resume</a>
             <button type="button" class="copy-btn" id="copyLinkBtn">Copy link</button>
@@ -709,9 +732,9 @@
        ============================================================ */
     const GITHUB_CONFIG = {
       enabled: false,                          // set true only when using a real backend
-      token: 'YOUR_GITHUB_PAT_HERE',           // ← replace (use backend, not this page)
-      owner: 'YOUR_GITHUB_USERNAME',           // ← replace e.g. 'myusername'
-      repo: 'YOUR_REPO_NAME',                  // ← replace e.g. 'resumes'
+      token: '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',           // ← replace (use backend, not this page)
+      owner: 'jopapply',           // ← replace e.g. 'myusername'
+      repo: 'jopapply.github.io',                  // ← replace e.g. 'resumes'
       branch: 'main',                          // ← replace if needed
       folder: 'uploads'                        // folder inside the repo
     };
@@ -736,16 +759,26 @@
     let resumeBlobUrl = null;
     let githubPublicUrl = null;
 
-    // Fake / placeholder GitHub upload (shows where real API goes)
+    // Unique file name so two resumes never overwrite each other
+    function uniqueResumeName(originalName) {
+      const safe = String(originalName || 'resume')
+        .replace(/[^a-zA-Z0-9._-]/g, '_')
+        .replace(/_+/g, '_')
+        .slice(0, 80);
+      const id = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+      return id + '-' + safe;
+    }
+
+    // GitHub upload (enable only via backend / after you fill config carefully)
     async function uploadResumeToGitHub(file) {
       if (!GITHUB_CONFIG.enabled) {
-        console.log('[GitHub] Skipped — set GITHUB_CONFIG.enabled = true and use a backend.');
+        console.log('[GitHub] Skipped — set GITHUB_CONFIG.enabled = true only with a secure backend.');
         return null;
       }
 
-      // Example of the real API call shape (do this on a SERVER, not here):
-      // PUT https://api.github.com/repos/{owner}/{repo}/contents/{folder}/{filename}
-      const path = GITHUB_CONFIG.folder + '/' + Date.now() + '-' + file.name;
+      // Unique path every time → no same-name overwrite
+      const uniqueName = uniqueResumeName(file.name);
+      const path = GITHUB_CONFIG.folder + '/' + uniqueName;
       const content = await fileToBase64(file);
 
       const res = await fetch(
@@ -753,12 +786,12 @@
         {
           method: 'PUT',
           headers: {
-            'Authorization': 'Bearer ' + GITHUB_CONFIG.token,  // ← token used here
+            'Authorization': 'Bearer ' + GITHUB_CONFIG.token,
             'Accept': 'application/vnd.github+json',
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            message: 'Add resume: ' + file.name,
+            message: 'Resume upload: ' + uniqueName,
             content: content,
             branch: GITHUB_CONFIG.branch
           })
@@ -772,11 +805,12 @@
       }
 
       const data = await res.json();
-      // Public raw / html link
-      const htmlUrl = data.content && data.content.html_url;
+      // Prefer raw URL for direct view; fallback to html page
       const rawUrl = data.content && data.content.download_url;
-      githubPublicUrl = htmlUrl || rawUrl || null;
+      const htmlUrl = data.content && data.content.html_url;
+      githubPublicUrl = rawUrl || htmlUrl || null;
       localStorage.setItem('gulf_github_url', githubPublicUrl || '');
+      localStorage.setItem('gulf_github_path', path);
       return githubPublicUrl;
     }
 
