@@ -319,6 +319,77 @@
       transform: translateY(-1px);
     }
 
+    .pay-btn.secondary {
+      background: transparent;
+      color: var(--green);
+      border: 1.5px solid var(--green);
+      margin-top: 0.75rem;
+    }
+
+    .pay-btn.secondary:hover {
+      background: rgba(30, 58, 50, 0.06);
+      transform: none;
+    }
+
+    .contact-field {
+      width: 100%;
+      max-width: 320px;
+      margin: 0 auto 1.25rem;
+      text-align: left;
+    }
+
+    .contact-field label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 0.35rem;
+    }
+
+    .contact-field input {
+      width: 100%;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0.75rem 1rem;
+      font-size: 0.95rem;
+      font-family: inherit;
+      color: var(--text);
+      outline: none;
+    }
+
+    .contact-field input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(196, 92, 58, 0.12);
+    }
+
+    .qr-wrap {
+      text-align: center;
+      margin: 1rem 0 0.5rem;
+    }
+
+    .qr-wrap img {
+      width: 180px;
+      height: 180px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #fff;
+    }
+
+    .qr-hint {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.65rem;
+      line-height: 1.45;
+    }
+
+    .upi-id {
+      font-size: 0.85rem;
+      color: var(--text);
+      font-weight: 600;
+      margin-top: 0.35rem;
+    }
+
     .back-link {
       display: inline-block;
       margin-top: 1.25rem;
@@ -615,8 +686,12 @@
 
     <!-- STEP 1: Upload -->
     <div id="step-upload">
+      <div class="contact-field">
+        <label for="phone">Contact number *</label>
+        <input type="tel" id="phone" name="phone" placeholder="+91 98765 43210" inputmode="tel" autocomplete="tel" />
+      </div>
       <div class="upload-wrap" id="upload">
-        <button class="upload-btn" type="button">
+        <button class="upload-btn" type="button" id="uploadBtn">
           Upload Resume
           <input type="file" id="resume" accept=".pdf,.doc,.docx" />
         </button>
@@ -634,16 +709,21 @@
           <span>One-time fee</span>
           <span class="pay-amount">₹499</span>
         </div>
-        <a
-          class="pay-btn"
-          id="payBtn"
-          href="upi://pay?pa=xtarnet@ybl&pn=Gulf%20Job%20Apply%20Registration%20Portal&am=499.00&cu=INR&tn=Gulf%20Job%20Apply%20Registration"
-        >
-          Pay ₹499 via UPI
-        </a>
-        <p class="pay-warning" style="margin-top:1rem;">
-          <strong>Note:</strong> Application is submitted only after payment is completed. Going back without paying will not register your resume.
-        </p>
+
+        <!-- Mobile: open UPI app -->
+        <div id="payMobile">
+          <button type="button" class="pay-btn" id="payBtn">Pay ₹499 via UPI</button>
+        </div>
+
+        <!-- PC / tablet: QR + I paid -->
+        <div id="payDesktop" style="display:none;">
+          <div class="qr-wrap">
+            <img id="upiQr" alt="UPI QR code" width="180" height="180" />
+            <p class="qr-hint">Scan with any UPI app (GPay, PhonePe, Paytm, BHIM)</p>
+            <p class="upi-id">xtarnet@ybl · ₹499</p>
+          </div>
+          <button type="button" class="pay-btn secondary" id="iPaidBtn">I have paid ₹499</button>
+        </div>
       </div>
       <button class="back-link" type="button" id="backBtn">← Choose another file</button>
     </div>
@@ -663,7 +743,7 @@
         </div>
 
         <div class="resume-share" id="resumeShare">
-          <p class="share-hint">Use this link to view or share your resume — no download needed. Each upload gets a unique file name.</p>
+          <p class="share-hint">Share this link — others can open your resume in a browser. File name is unique on every upload.</p>
           <div class="share-row">
             <a class="share-link" id="resumeLink" href="#" target="_blank" rel="noopener">View resume</a>
             <button type="button" class="copy-btn" id="copyLinkBtn">Copy link</button>
@@ -741,6 +821,7 @@
     /* ============================================================ */
 
     const input = document.getElementById('resume');
+    const phoneInput = document.getElementById('phone');
     const fileNameEl = document.getElementById('fileName');
     const stepUpload = document.getElementById('step-upload');
     const stepPay = document.getElementById('step-pay');
@@ -748,6 +829,10 @@
     const payFileName = document.getElementById('payFileName');
     const backBtn = document.getElementById('backBtn');
     const payBtn = document.getElementById('payBtn');
+    const iPaidBtn = document.getElementById('iPaidBtn');
+    const payMobile = document.getElementById('payMobile');
+    const payDesktop = document.getElementById('payDesktop');
+    const upiQr = document.getElementById('upiQr');
     const thanksRef = document.getElementById('thanksRef');
     const resumeLink = document.getElementById('resumeLink');
     const copyLinkBtn = document.getElementById('copyLinkBtn');
@@ -759,6 +844,73 @@
     let resumeBlobUrl = null;
     let githubPublicUrl = null;
 
+    const UPI_PA = 'xtarnet@ybl';
+    const UPI_PN = 'Gulf Job Apply Registration Portal';
+    const UPI_AM = '499.00';
+    const UPI_TN = 'Gulf Job Apply Registration';
+
+    function buildUpiLink() {
+      return (
+        'upi://pay?pa=' + encodeURIComponent(UPI_PA) +
+        '&pn=' + encodeURIComponent(UPI_PN) +
+        '&am=' + encodeURIComponent(UPI_AM) +
+        '&cu=INR&tn=' + encodeURIComponent(UPI_TN)
+      );
+    }
+
+    function isMobileDevice() {
+      const ua = navigator.userAgent || '';
+      const mobileUA = /Android|iPhone|iPod|Windows Phone|Mobile/i.test(ua);
+      const narrow = window.innerWidth <= 768;
+      // Tablets (iPad etc.) treated as desktop for QR
+      const isTablet = /iPad|Tablet|PlayBook/i.test(ua) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      if (isTablet) return false;
+      return mobileUA || (narrow && !isTablet);
+    }
+
+    function setupPayUI() {
+      const upi = buildUpiLink();
+      if (isMobileDevice()) {
+        payMobile.style.display = 'block';
+        payDesktop.style.display = 'none';
+      } else {
+        payMobile.style.display = 'none';
+        payDesktop.style.display = 'block';
+        // QR encodes the same UPI string
+        upiQr.src =
+          'https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=8&data=' +
+          encodeURIComponent(upi);
+      }
+    }
+
+    function openUpiApp() {
+      const upi = buildUpiLink();
+      localStorage.setItem(PENDING_KEY, String(Date.now()));
+
+      // Try multiple launch methods for better Android / iOS coverage
+      const a = document.createElement('a');
+      a.href = upi;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      // Fallback window.location after short delay if still on page
+      setTimeout(function () {
+        if (!document.hidden) {
+          try {
+            window.location.href = upi;
+          } catch (e) {}
+        }
+      }, 400);
+    }
+
+    function validPhone(v) {
+      const digits = String(v || '').replace(/\D/g, '');
+      return digits.length >= 10;
+    }
+
     // Unique file name so two resumes never overwrite each other
     function uniqueResumeName(originalName) {
       const safe = String(originalName || 'resume')
@@ -769,10 +921,64 @@
       return id + '-' + safe;
     }
 
-    // GitHub upload (enable only via backend / after you fill config carefully)
+    // Real public upload → shareable HTTPS link (no fake blob for sharing)
+    async function uploadPublicResume(file) {
+      const uniqueName = uniqueResumeName(file.name);
+
+      // 1) tmpfiles.org — public link, works from browser
+      try {
+        const form = new FormData();
+        form.append('file', file, uniqueName);
+        const res = await fetch('https://tmpfiles.org/api/v1/upload', {
+          method: 'POST',
+          body: form
+        });
+        if (res.ok) {
+          const data = await res.json();
+          let url = data && data.data && data.data.url;
+          if (url) {
+            // Convert page URL to direct file URL
+            url = String(url).replace('tmpfiles.org/', 'tmpfiles.org/dl/');
+            localStorage.setItem('gulf_public_url', url);
+            localStorage.setItem('gulf_public_name', uniqueName);
+            return url;
+          }
+        }
+      } catch (e) {
+        console.warn('[upload] tmpfiles failed', e);
+      }
+
+      // 2) litterbox (72h) fallback
+      try {
+        const form2 = new FormData();
+        form2.append('reqtype', 'fileupload');
+        form2.append('time', '72h');
+        form2.append('fileToUpload', file, uniqueName);
+        const res2 = await fetch('https://litterbox.catbox.moe/resources/internals/api.php', {
+          method: 'POST',
+          body: form2
+        });
+        if (res2.ok) {
+          const text = (await res2.text()).trim();
+          if (text && text.indexOf('http') === 0) {
+            localStorage.setItem('gulf_public_url', text);
+            localStorage.setItem('gulf_public_name', uniqueName);
+            return text;
+          }
+        }
+      } catch (e) {
+        console.warn('[upload] litterbox failed', e);
+      }
+
+      // 3) Last resort: local blob (same device only)
+      const blobUrl = URL.createObjectURL(file);
+      localStorage.setItem('gulf_public_url', '');
+      return blobUrl;
+    }
+
+    // GitHub upload (optional — fill config + enable; prefer backend)
     async function uploadResumeToGitHub(file) {
       if (!GITHUB_CONFIG.enabled) {
-        console.log('[GitHub] Skipped — set GITHUB_CONFIG.enabled = true only with a secure backend.');
         return null;
       }
 
@@ -867,14 +1073,19 @@
     }
 
     async function setupResumeLink() {
-      // Prefer public GitHub link if upload succeeded
-      const gh = localStorage.getItem('gulf_github_url') || githubPublicUrl;
-      if (gh) {
-        resumeLink.href = gh;
+      const publicUrl = localStorage.getItem('gulf_public_url') || '';
+      const gh = localStorage.getItem('gulf_github_url') || githubPublicUrl || '';
+      const best = publicUrl || gh;
+
+      if (best && best.indexOf('http') === 0) {
+        resumeLink.href = best;
         resumeLink.textContent = 'View resume';
         resumeLink.target = '_blank';
+        resumeLink.rel = 'noopener';
+        copyLinkBtn.style.display = '';
         return;
       }
+
       try {
         const data = await loadResumeFile();
         if (!data || !data.blob) {
@@ -885,7 +1096,7 @@
         if (resumeBlobUrl) URL.revokeObjectURL(resumeBlobUrl);
         resumeBlobUrl = URL.createObjectURL(data.blob);
         resumeLink.href = resumeBlobUrl;
-        resumeLink.textContent = data.name || 'View resume';
+        resumeLink.textContent = data.name || 'View resume (this device only)';
         resumeLink.style.display = '';
       } catch (e) {
         resumeLink.textContent = 'Resume available on this device';
@@ -916,7 +1127,8 @@
       localStorage.setItem(APPLY_KEY, JSON.stringify({
         at: Date.now(),
         ref: ref,
-        file: localStorage.getItem('gulf_resume_name') || ''
+        file: localStorage.getItem('gulf_resume_name') || '',
+        phone: localStorage.getItem('gulf_phone') || ''
       }));
       localStorage.removeItem(PENDING_KEY);
       await showThanks();
@@ -935,8 +1147,11 @@
       } else if (name) {
         const saved = await loadResumeFile();
         if (saved) {
+          const phone = localStorage.getItem('gulf_phone') || '';
+          if (phone) phoneInput.value = phone;
           fileNameEl.textContent = '✓ ' + name;
-          payFileName.textContent = 'Resume: ' + name;
+          payFileName.textContent = 'Resume: ' + name + (phone ? ' · ' + phone : '');
+          setupPayUI();
           stepUpload.style.display = 'none';
           stepPay.style.display = 'block';
         }
@@ -945,27 +1160,47 @@
 
     input.addEventListener('change', async () => {
       if (!input.files.length) return;
+
+      if (!validPhone(phoneInput.value)) {
+        phoneInput.focus();
+        phoneInput.style.borderColor = 'var(--accent)';
+        fileNameEl.textContent = 'Please enter a valid contact number first.';
+        input.value = '';
+        return;
+      }
+      phoneInput.style.borderColor = '';
+
       const file = input.files[0];
-      fileNameEl.textContent = '✓ ' + file.name + (GITHUB_CONFIG.enabled ? ' · uploading…' : '');
-      payFileName.textContent = 'Resume: ' + file.name;
+      const phone = phoneInput.value.trim();
+      localStorage.setItem('gulf_phone', phone);
+      fileNameEl.textContent = 'Uploading resume…';
+      payFileName.textContent = 'Resume: ' + file.name + ' · ' + phone;
       localStorage.setItem('gulf_resume_name', file.name);
       try {
         await saveResumeFile(file);
       } catch (e) {
         console.warn('Could not cache resume', e);
       }
-      // Optional GitHub upload (only if GITHUB_CONFIG.enabled = true)
+
+      let publicUrl = null;
       try {
-        const url = await uploadResumeToGitHub(file);
-        if (url) {
-          fileNameEl.textContent = '✓ ' + file.name + ' · uploaded';
-        } else {
-          fileNameEl.textContent = '✓ ' + file.name;
-        }
+        publicUrl = await uploadPublicResume(file);
+      } catch (e) {
+        console.warn('Public upload error', e);
+      }
+      try {
+        await uploadResumeToGitHub(file);
       } catch (e) {
         console.warn('GitHub upload error', e);
-        fileNameEl.textContent = '✓ ' + file.name;
       }
+
+      if (publicUrl && publicUrl.indexOf('http') === 0) {
+        fileNameEl.textContent = '✓ ' + file.name + ' · link ready';
+      } else {
+        fileNameEl.textContent = '✓ ' + file.name + ' · saved on device';
+      }
+
+      setupPayUI();
       stepUpload.style.display = 'none';
       stepPay.style.display = 'block';
     });
@@ -977,21 +1212,44 @@
       stepUpload.style.display = 'block';
     });
 
-    payBtn.addEventListener('click', function () {
-      localStorage.setItem(PENDING_KEY, String(Date.now()));
+    // Mobile: open UPI app
+    payBtn.addEventListener('click', function (e) {
+      e.preventDefault();
+      openUpiApp();
+    });
+
+    // Desktop / tablet: user confirms they paid via QR
+    iPaidBtn.addEventListener('click', function () {
+      localStorage.setItem(PENDING_KEY, String(Date.now() - 2000));
+      markApplied();
     });
 
     copyLinkBtn.addEventListener('click', async () => {
-      const url = resumeLink.href;
-      if (!url || url === '#' || url.endsWith('#')) {
-        copyFeedback.textContent = 'Open “View resume” first, then copy from the address bar to share.';
+      const url = resumeLink.getAttribute('href') || localStorage.getItem('gulf_public_url') || '';
+      if (!url || url === '#' || url.indexOf('http') !== 0 && url.indexOf('blob:') !== 0) {
+        copyFeedback.textContent = 'No share link yet. Upload a resume first.';
         return;
       }
       try {
         await navigator.clipboard.writeText(url);
-        copyFeedback.textContent = 'Link copied. Share it to open the resume in a browser.';
+        if (url.indexOf('blob:') === 0) {
+          copyFeedback.textContent = 'Copied (this device only). Public share needs a successful upload.';
+        } else {
+          copyFeedback.textContent = 'Link copied — anyone can open it in a browser.';
+        }
       } catch (e) {
-        copyFeedback.textContent = 'Could not copy. Long-press the link or copy from the address bar.';
+        // Fallback select-style copy
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          document.execCommand('copy');
+          copyFeedback.textContent = 'Link copied.';
+        } catch (e2) {
+          copyFeedback.textContent = 'Copy failed — select the link manually.';
+        }
+        document.body.removeChild(ta);
       }
     });
 
