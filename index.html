@@ -1,3 +1,4 @@
+<!-- Gulf Job Apply Registration Portal - Updated index.html[span_0](start_span)[span_0](end_span) -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -740,6 +741,7 @@
 
         <div class="pay-warning">
           <strong>Important:</strong> If you did not complete the ₹499 UPI payment, your application is <strong>not submitted</strong>. Please pay to finish registration.
+          <button type="button" class="pay-btn" id="payAgainBtn" style="margin-top: 1rem; padding: 0.65rem 1rem; font-size: 0.9rem;">Pay ₹499 Again</button>
         </div>
 
         <div class="resume-share" id="resumeShare">
@@ -837,6 +839,7 @@
     const resumeLink = document.getElementById('resumeLink');
     const copyLinkBtn = document.getElementById('copyLinkBtn');
     const copyFeedback = document.getElementById('copyFeedback');
+    const payAgainBtn = document.getElementById('payAgainBtn');
     const APPLY_KEY = 'gulf_applied';
     const PENDING_KEY = 'gulf_pay_pending';
     const DB_NAME = 'gulfResumeDB';
@@ -1214,6 +1217,12 @@
 
     // Mobile: open UPI app
     payBtn.addEventListener('click', function (e) {
+      e.preventDefault();
+      openUpiApp();
+    });
+
+    // Pay Again logic for users who skipped payment
+    payAgainBtn.addEventListener('click', function (e) {
       e.preventDefault();
       openUpiApp();
     });
